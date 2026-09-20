@@ -75,11 +75,11 @@ jobs:
             <application android:label="ExynosTools Android Layer" android:hasCode="false" android:extractNativeLibs="false" />
           </manifest>
           EOF
-          "$ANDROID_HOME/build-tools/35.0.0/aapt2" link -o out/unsigned.apk --manifest out/AndroidManifest.xml --min-sdk-version 29 --target-sdk-version 35 --version-code 1 --version-name 1.0
+          "$ANDROID_HOME/build-tools/35.0.0/aapt2" link -o out/unsigned.apk --manifest out/AndroidManifest.xml --min-sdk-version 29 --target-sdk-version 35 --version-code 1 --version-name 1.0 --auto-add-overlay
           cd out && zip -q -r unsigned.apk lib && cd ..
           keytool -genkeypair -keystore out/debug.keystore -storepass android -keypass android -alias androiddebugkey -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
           "$ANDROID_HOME/build-tools/35.0.0/zipalign" -f 4 out/unsigned.apk out/aligned.apk
-          "$ANDROID_HOME/build-tools/35.0.0/apksigner" sign --ks out/debug.keystore --ks-pass pass:android --key-pass android --out out/ExynosTools-Layer-debug.apk out/aligned.apk
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" sign --ks out/debug.keystore --ks-pass pass:android --key-pass pass:android --out out/ExynosTools-Layer-debug.apk out/aligned.apk
       - name: Verify APK
         run: |
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose out/ExynosTools-Layer-debug.apk
