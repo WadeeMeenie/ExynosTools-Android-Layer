@@ -14,26 +14,34 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
       - name: Install build tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y cmake ninja-build zipalign glslc
+          sudo apt-get install -y cmake ninja-build glslc
+
       - name: Set up Java
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
+
       - name: Set up Android SDK
         uses: android-actions/setup-android@v4
+
       - name: Install Android SDK and NDK
-        run: sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0" "ndk;27.2.12479018"
+        run: |
+          sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0" "ndk;27.2.12479018"
+
       - name: Fetch upstream ExynosTools
         run: git clone --depth 1 --branch 2.1 https://github.com/WearyConcern1165/ExynosTools.git upstream
+
       - name: Fetch Vulkan dependencies
         run: |
           git clone --depth 1 https://github.com/KhronosGroup/Vulkan-Headers.git deps/Vulkan-Headers
           git clone --depth 1 https://github.com/KhronosGroup/Vulkan-Utility-Libraries.git deps/Vulkan-Utility-Libraries
           git clone --depth 1 https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator.git deps/VulkanMemoryAllocator
+
       - name: Prepare source
         run: |
           cp -a upstream build-source
@@ -46,6 +54,7 @@ jobs:
           cp -a deps/Vulkan-Headers build-source/external/Vulkan-Headers
           mkdir -p build-source/external/Vulkan-Utility-Libraries
           cp -a deps/Vulkan-Utility-Libraries/. build-source/external/Vulkan-Utility-Libraries/
+
       - name: Build ARM64 layer
         env:
           ANDROID_NDK_HOME: ${{ env.ANDROID_HOME }}/ndk/27.2.12479018
@@ -61,29 +70,60 @@ jobs:
             -DEXYNOS_LAYER_USE_LOCAL_VULKAN_REPOS=OFF \
             -DEXYNOS_VULKAN_HEADERS_PATH="$GITHUB_WORKSPACE/deps/Vulkan-Headers"
           cmake --build build-native --parallel 2
+
       - name: Package APK
         shell: bash
         run: |
           rm -rf out
           mkdir -p out/lib/arm64-v8a
+
           cp build-native/libVkLayer_VortekXclipse.so out/lib/arm64-v8a/libVkLayer_ExynosTools.so
           cp build-source/VkLayer_vortek_xclipse.json out/lib/arm64-v8a/VkLayer_exynostools.json
           python3 scripts/patch_manifest.py out/lib/arm64-v8a/VkLayer_exynostools.json
+
           cat > out/AndroidManifest.xml <<'EOF'
           <?xml version="1.0" encoding="utf-8"?>
           <manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.wade.exynostools.layer">
-            <application android:label="ExynosTools Android Layer" android:hasCode="false" android:extractNativeLibs="false" />
+            <application
+              android:label="ExynosTools Android Layer"
+              android:hasCode="false"
+              android:extractNativeLibs="false" />
           </manifest>
           EOF
-          "$ANDROID_HOME/build-tools/35.0.0/aapt2" link -o out/unsigned.apk -I "$ANDROID_HOME/platforms/android-35/android.jar" --manifest out/AndroidManifest.xml --min-sdk-version 29 --target-sdk-version 35 --version-code 1 --version-name 1.0 --auto-add-overlay
-          cd out && zip -q -0 -r unsigned.apk lib && cd ..
-          keytool -genkeypair -keystore out/debug.keystore -storepass android -keypass android -alias androiddebugkey -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
-          "$ANDROID_HOME/build-tools/35.0.0/zipalign" -P 16 -f 4 out/unsigned.apk out/aligned.apk
-          "$ANDROID_HOME/build-tools/35.0.0/apksigner" sign --ks out/debug.keystore --ks-pass pass:android --key-pass pass:android --out out/ExynosTools-Layer-debug.apk out/aligned.apk
-      - name: Verify APK
+
+          "$ANDROID_HOME/build-tools/35.0.0/aapt2" link             -o out/unsigned-base.apk             -I "$ANDROID_HOME/platforms/android-35/android.jar"             --manifest out/AndroidManifest.xml             --min-sdk-version 29             --target-sdk-version 35             --version-code 1             --version-name 1.0             --auto-add-overlay
+
+          mkdir -p out/stage/lib/arm64-v8a
+          cp out/lib/arm64-v8a/libVkLayer_ExynosTools.so out/stage/lib/arm64-v8a/
+          cp out/lib/arm64-v8a/VkLayer_exynostools.json out/stage/lib/arm64-v8a/
+
+          cd out/stage
+          zip -q -0 -r ../unsigned.apk lib
+          cd ../..
+
+          # Merge the aapt2-generated APK contents into the unsigned APK.
+          unzip -q -o out/unsigned-base.apk -d out/base
+          cd out/base
+          zip -q -0 -r ../unsigned.apk AndroidManifest.xml
+          cd ../..
+
+          keytool -genkeypair             -keystore out/debug.keystore             -storepass android             -keypass android             -alias androiddebugkey             -keyalg RSA             -keysize 2048             -validity 10000             -dname "CN=Android Debug,O=Android,C=US"
+
+          # Align the APK before signing. Native libraries must be page aligned.
+          "$ANDROID_HOME/build-tools/35.0.0/zipalign"             -P 16 -f 4             out/unsigned.apk             out/aligned.apk
+
+          "$ANDROID_HOME/build-tools/35.0.0/zipalign"             -c -P 16 -v 4             out/aligned.apk
+
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" sign             --ks out/debug.keystore             --ks-pass pass:android             --key-pass pass:android             --out out/ExynosTools-Layer-debug.apk             out/aligned.apk
+
+      - name: Verify final APK
+        shell: bash
         run: |
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose out/ExynosTools-Layer-debug.apk
-          unzip -l out/ExynosTools-Layer-debug.apk | grep -E 'lib/arm64-v8a/(libVkLayer_ExynosTools.so|VkLayer_exynostools.json)'
+          "$ANDROID_HOME/build-tools/35.0.0/zipalign" -c -P 16 -v 4 out/ExynosTools-Layer-debug.apk
+          unzip -l out/ExynosTools-Layer-debug.apk | grep -E 'AndroidManifest.xml|lib/arm64-v8a/(libVkLayer_ExynosTools.so|VkLayer_exynostools.json)'
+          unzip -Z -v out/ExynosTools-Layer-debug.apk | grep -A 18 'libVkLayer_ExynosTools.so'
+
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
