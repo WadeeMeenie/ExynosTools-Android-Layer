@@ -38,6 +38,7 @@ jobs:
         run: |
           cp -a upstream build-source
           python3 scripts/rename_layer.py build-source
+          cp "$GITHUB_WORKSPACE/exports.map" build-source/exports.map
           rm -rf build-source/external/VulkanMemoryAllocator
           mkdir -p build-source/external
           cp -a deps/VulkanMemoryAllocator build-source/external/VulkanMemoryAllocator
@@ -78,7 +79,7 @@ jobs:
           cd out && zip -q -r unsigned.apk lib && cd ..
           keytool -genkeypair -keystore out/debug.keystore -storepass android -keypass android -alias androiddebugkey -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
           "$ANDROID_HOME/build-tools/35.0.0/zipalign" -f 4 out/unsigned.apk out/aligned.apk
-          "$ANDROID_HOME/build-tools/35.0.0/apksigner" sign --ks out/debug.keystore --ks-pass pass:android --key-pass pass:android --out out/ExynosTools-Layer-debug.apk out/aligned.apk
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" sign --ks out/debug.keystore --ks-pass pass:android --key-pass android --out out/ExynosTools-Layer-debug.apk out/aligned.apk
       - name: Verify APK
         run: |
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose out/ExynosTools-Layer-debug.apk
