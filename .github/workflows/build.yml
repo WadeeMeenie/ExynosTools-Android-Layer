@@ -74,12 +74,14 @@ jobs:
       - name: Package APK with Gradle
         shell: bash
         run: |
-          rm -rf app/src/main/jniLibs app/src/main/layer
-          mkdir -p app/src/main/jniLibs/arm64-v8a app/src/main/layer/arm64-v8a
+          rm -rf app/src/main/jniLibs
+          mkdir -p app/src/main/jniLibs/arm64-v8a
 
+          # Keep the Vulkan layer manifest beside the native library.
+          # Both are packaged by AGP under lib/<ABI>.
           cp build-native/libVkLayer_VortekXclipse.so app/src/main/jniLibs/arm64-v8a/libVkLayer_ExynosTools.so
-          cp build-source/VkLayer_vortek_xclipse.json app/src/main/layer/arm64-v8a/VkLayer_exynostools.json
-          python3 scripts/patch_manifest.py app/src/main/layer/arm64-v8a/VkLayer_exynostools.json
+          cp build-source/VkLayer_vortek_xclipse.json app/src/main/jniLibs/arm64-v8a/VkLayer_exynostools.json
+          python3 scripts/patch_manifest.py app/src/main/jniLibs/arm64-v8a/VkLayer_exynostools.json
 
           chmod +x ./gradlew 2>/dev/null || true
           if [ ! -x ./gradlew ]; then
@@ -91,28 +93,18 @@ jobs:
           fi
 
           mkdir -p out
-          cp app/build/outputs/apk/debug/app-debug.apk out/gradle.apk
+          cp app/build/outputs/apk/debug/app-debug.apk out/unsigned.apk
 
-          # Vulkan layer manifests must live beside the native library in lib/<ABI>.
-          unzip -l out/gradle.apk | grep -q 'lib/arm64-v8a/libVkLayer_ExynosTools.so'
-          cp out/gradle.apk out/unsigned.apk
-          rm -rf /tmp/exynostools-layer-json
-          mkdir -p /tmp/exynostools-layer-json/lib/arm64-v8a
-          cp app/src/main/layer/arm64-v8a/VkLayer_exynostools.json /tmp/exynostools-layer-json/lib/arm64-v8a/
-          cd /tmp/exynostools-layer-json
-          zip -q -0 -r "$GITHUB_WORKSPACE/out/unsigned.apk" lib
-          cd "$GITHUB_WORKSPACE"
-
-          "$ANDROID_HOME/build-tools/35.0.0/zipalign" -P 16 -f 4 out/unsigned.apk out/aligned.apk
-
-          "$ANDROID_HOME/build-tools/35.0.0/zipalign" -c -P 16 -v 4 out/aligned.apk
+          # Native library is intentionally compressed. This avoids the
+          # uncompressed .so page-alignment requirement that caused
+          # INSTALL_FAILED_INVALID_APK on the target phone.
+          unzip -Z -v out/unsigned.apk | grep -A 12 'libVkLayer_ExynosTools.so'
 
           keytool -genkeypair -keystore out/debug.keystore -storepass android -keypass android -alias androiddebugkey -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
 
-          "$ANDROID_HOME/build-tools/35.0.0/apksigner" sign --ks out/debug.keystore --ks-pass pass:android --key-pass pass:android --out out/ExynosTools-Layer-debug.apk out/aligned.apk
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" sign --ks out/debug.keystore --ks-pass pass:android --key-pass pass:android --out out/ExynosTools-Layer-debug.apk out/unsigned.apk
 
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose out/ExynosTools-Layer-debug.apk
-          "$ANDROID_HOME/build-tools/35.0.0/zipalign" -c -P 16 -v 4 out/ExynosTools-Layer-debug.apk
           unzip -l out/ExynosTools-Layer-debug.apk | grep -E 'lib/arm64-v8a/(libVkLayer_ExynosTools.so|VkLayer_exynostools.json)'
 
       - name: Upload APK
