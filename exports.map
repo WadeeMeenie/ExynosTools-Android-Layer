@@ -1,0 +1,8 @@
+VULKAN_1.0 {
+  global:
+    vkGetInstanceProcAddr;
+    vkGetDeviceProcAddr;
+    vkNegotiateLoaderLayerInterfaceVersion;
+  local:
+    *;
+};
