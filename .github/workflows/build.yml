@@ -109,7 +109,7 @@ jobs:
 
           keytool -genkeypair -keystore out/debug.keystore -storepass android -keypass android -alias androiddebugkey -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
 
-          "$ANDROID_HOME/build-tools/35.0.0/apksigner" sign --ks out/debug.keystore --ks-pass pass:android --key-pass android --out out/ExynosTools-Layer-debug.apk out/aligned.apk
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" sign --ks out/debug.keystore --ks-pass pass:android --key-pass pass:android --out out/ExynosTools-Layer-debug.apk out/aligned.apk
 
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose out/ExynosTools-Layer-debug.apk
           "$ANDROID_HOME/build-tools/35.0.0/zipalign" -c -P 16 -v 4 out/ExynosTools-Layer-debug.apk
