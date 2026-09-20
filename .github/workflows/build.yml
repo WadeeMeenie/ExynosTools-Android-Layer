@@ -41,6 +41,8 @@ jobs:
           rm -rf build-source/external/VulkanMemoryAllocator
           mkdir -p build-source/external
           cp -a deps/VulkanMemoryAllocator build-source/external/VulkanMemoryAllocator
+          rm -rf build-source/external/Vulkan-Headers
+          cp -a deps/Vulkan-Headers build-source/external/Vulkan-Headers
           mkdir -p build-source/external/Vulkan-Utility-Libraries
           cp -a deps/Vulkan-Utility-Libraries/. build-source/external/Vulkan-Utility-Libraries/
       - name: Build ARM64 layer
@@ -54,7 +56,7 @@ jobs:
             -DCMAKE_BUILD_TYPE=Release \
             -DEXYNOS_LAYER_BUILD_SHADERS=ON \
             -DEXYNOS_LAYER_EMBED_SHADERS=ON \
-            -DEXYNOS_LAYER_USE_SUBMODULE_DEPS=OFF \
+            -DEXYNOS_LAYER_USE_SUBMODULE_DEPS=ON \
             -DEXYNOS_LAYER_USE_LOCAL_VULKAN_REPOS=OFF \
             -DEXYNOS_VULKAN_HEADERS_PATH="$GITHUB_WORKSPACE/deps/Vulkan-Headers"
           cmake --build build-native --parallel 2
