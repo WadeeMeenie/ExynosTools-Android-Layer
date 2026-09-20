@@ -94,17 +94,14 @@ jobs:
           cp app/build/outputs/apk/debug/app-debug.apk out/gradle.apk
 
           # Vulkan layer manifests must live beside the native library in lib/<ABI>.
-          cd app/build/outputs/apk/debug
-          zip -q -0 app-debug.apk layer/arm64-v8a/VkLayer_exynostools.json 2>/dev/null || true
-          cd ../../../../..
-
-          # If the JSON was not added above, add it explicitly at the required path.
           unzip -l out/gradle.apk | grep -q 'lib/arm64-v8a/libVkLayer_ExynosTools.so'
           cp out/gradle.apk out/unsigned.apk
-          cd /tmp
-          zip -q -0 -j /tmp/layer-json.zip "$GITHUB_WORKSPACE/app/src/main/layer/arm64-v8a/VkLayer_exynostools.json"
+          rm -rf /tmp/exynostools-layer-json
+          mkdir -p /tmp/exynostools-layer-json/lib/arm64-v8a
+          cp app/src/main/layer/arm64-v8a/VkLayer_exynostools.json /tmp/exynostools-layer-json/lib/arm64-v8a/
+          cd /tmp/exynostools-layer-json
+          zip -q -0 -r "$GITHUB_WORKSPACE/out/unsigned.apk" lib
           cd "$GITHUB_WORKSPACE"
-          zip -q -0 out/unsigned.apk -j /tmp/layer-json.zip
 
           "$ANDROID_HOME/build-tools/35.0.0/zipalign" -P 16 -f 4 out/unsigned.apk out/aligned.apk
 
