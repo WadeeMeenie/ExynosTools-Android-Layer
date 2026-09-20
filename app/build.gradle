@@ -12,9 +12,13 @@ android {
         versionName '1.0'
     }
 
+    // The phone is rejecting the previous uncompressed APK because the
+    // final native-library ZIP entry was not page-aligned after repackaging.
+    // Compressed native libraries avoid the Android Package Manager's
+    // uncompressed-library alignment requirement; Android extracts them.
     packaging {
         jniLibs {
-            useLegacyPackaging = false
+            useLegacyPackaging = true
         }
     }
 }
